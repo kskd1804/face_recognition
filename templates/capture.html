@@ -1,0 +1,22 @@
+<html>
+    <head>
+        <title>Welcome</title>
+        <style>
+            body {
+                padding: 18px;
+            }
+            h1 {
+                font-size: 24px;
+                color: rgba(0,0,0,0.7)
+            }
+            .feed {
+                width: 100%;
+            }
+        </style>
+    </head>
+    <body>
+        <h1>Face Recognition based Attendance System</h1>
+        <p>Please face the camera to have your attendance marked.</p>
+        <img src="{{ url_for('stream') }}" class="feed"/>
+    </body>
+</html>
