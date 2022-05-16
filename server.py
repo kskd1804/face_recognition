@@ -1,10 +1,11 @@
-from flask import Flask, Response, render_template
+from crypt import methods
+from flask import Flask, Response, render_template, request, redirect, url_for
 import recognition
 
 app = Flask(__name__)
 
 images_dir = "./dataset/"
-encodings, labels = recognition.load_images(images_dir)
+encodings, labels = recognition.load_images()
 
 @app.route("/feed")
 def stream():
