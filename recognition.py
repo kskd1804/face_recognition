@@ -5,6 +5,7 @@ import cv2
 from pathlib import Path
 import numpy as np
 import pandas as pd
+from datetime import datetime
 
 def load_images():
     print("Loading the image dataset...")
@@ -27,8 +28,29 @@ def load_images():
             print(e)
     return encodings, labels
 
+def mark_attendance(rollno, name):
+    timestamp = datetime.now()
+    tag = "LOGIN"
+    startrow = 1
+    try:
+        df_attendance = pd.read_excel("./database/attendance.xlsx", header=0)
+        startrow = len(df_attendance) + 1
+        print(df_attendance)
+        if len(df_attendance) > 0:
+            df_marked = df_attendance[df_attendance["Date"].dt.date == datetime.now().date()]["Activity"]
+            tag  = "LOGOUT" if len(df_marked) > 0 and df_marked[len(df_marked)-1] == "LOGIN" else "LOGIN"
+    except Exception as e:
+        print("Error:", e)
+    df = pd.DataFrame([[timestamp, rollno, name, tag]], columns=['Date', 'RollNo', 'StudentName', 'Activity'])
+    with pd.ExcelWriter("./database/attendance.xlsx", if_sheet_exists='overlay', mode='a', engine="openpyxl") as writer:
+        df.to_excel(writer, index=False, header=False, startrow=startrow)
+    print("Mark Attendance", name, rollno, tag)
+    return tag
+
 def feed(encodings, labels):
     video_capture = cv2.VideoCapture(0)
+    memory = [0]*len(labels)
+    tags = ["LOGIN"]*len(labels)
     while True:
         ret, frame = video_capture.read()
         if not ret:
@@ -48,20 +70,30 @@ def feed(encodings, labels):
             best_match_index = np.argmin(face_distances)
 
             if matches[best_match_index]:
-                identifier = labels[best_match_index]
-            identifiers.append(identifier)
+                identifier = (*labels[best_match_index], best_match_index)
+                identifiers.append(identifier)
 
-        for (top, right, bottom, left), (rollno, name) in zip(face_locations, identifiers):
+        for (top, right, bottom, left), (rollno, name, index) in zip(face_locations, identifiers):
             top *= 4
+            top += 20
             right *= 4
+            right += 20
             left *= 4
+            left += 20
             bottom *= 4
-
-            cv2.rectangle(frame, (left, top), (right, bottom), (0,0,255), 2)
-
-            cv2.rectangle(frame, (left, bottom-35), (right, bottom), (0,0,255), cv2.FILLED)
+            bottom += 20
+            tag = tags[index]
+            stamp = datetime.now().timestamp()
+            if stamp - memory[index] >= 5:
+                tag = mark_attendance(rollno, name)
+            memory[index] = stamp
+            tags[index] = tag
+            cv2.rectangle(frame, (left, top), (right, bottom), (255,0,255), 2)
+            cv2.rectangle(frame, (left, bottom-35), (right, bottom), (255,0,255), cv2.FILLED)
+            cv2.rectangle(frame, (left, bottom-70), (right, bottom), (255,0,255), cv2.FILLED)
             font = cv2.FONT_HERSHEY_DUPLEX
-            cv2.putText(frame, name, (left+6, bottom-6), font, 1.0, (255, 255, 255), 1)
+            cv2.putText(frame, name, (left+6, bottom-40), font, 1.0, (255, 255, 255), 1)
+            cv2.putText(frame, tag+" success", (left+6, bottom-6), font, 1.0, (255, 255, 255), 1)
         ret, buffer = cv2.imencode('.jpg', frame)
         frame = buffer.tobytes()
         yield(b'--frame\r\n'
